@@ -1,0 +1,87 @@
+{
+  "Comment": "Process Scientific Equipments' data",
+  "StartAt": "Clean the data",
+  "States": {
+    "Clean the data": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "OutputPath": "$.Payload",
+      "Parameters": {
+        "FunctionName": "arn:aws:lambda:us-east-1:908892649677:function:demo1",
+        "Payload.$": "$"
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 5,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ],
+      "Next": "Check if observations exist"
+    },
+    "Check if observations exist": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.number_of_observations",
+          "NumericLessThanEquals": 0,
+          "Next": "Do Nothing"
+        }
+      ],
+      "Default": "Create and Process Batches"
+    },
+    "Do Nothing": {
+      "Type": "Pass",
+      "End": true
+    },
+    "Create and Process Batches": {
+      "Type": "Map",
+      "ItemProcessor": {
+        "ProcessorConfig": {
+          "Mode": "INLINE"
+        },
+        "StartAt": "Process Observations",
+        "States": {
+          "Process Observations": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::lambda:invoke",
+            "OutputPath": "$.Payload",
+            "Parameters": {
+              "FunctionName": "arn:aws:lambda:us-east-1:908892649677:function:process_function",
+              "Payload.$": "$"
+            },
+            "Retry": [
+              {
+                "ErrorEquals": [
+                  "Lambda.TooManyRequestsException"
+                ],
+                "IntervalSeconds": 5,
+                "MaxAttempts": 3,
+                "BackoffRate": 2
+              }
+            ],
+            "End": true
+          }
+        }
+      },
+      "MaxConcurrency": 200,
+      "ItemsPath": "$.observations",
+      "ItemBatcher": {
+        "MaxItemsPerBatch": 5000
+      },
+      "Next": "Send Alerts"
+    },
+    "Send Alerts": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Parameters": {
+        "Message.$": "$",
+        "TopicArn": "arn:aws:sns:us-east-1:908892649677:sns-topic-test"
+      },
+      "End": true
+    }
+  }
+}
