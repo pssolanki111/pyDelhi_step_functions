@@ -8,19 +8,22 @@ STANDARD_OBSERVATION = {
 
 
 def handler(event, context):
-    observations = event['observations_batch']
-    qualified_observations = list(process_observations(observations))
-    return {"qualified_observations": qualified_observations}
+    qualified_observation = process_observation(event["qualified_observations"][0])
+    return {
+        "qualified_observations":
+            [qualified_observation] if qualified_observation else []
+    }
 
 
-def process_observations(observations):
+def process_observation(observation) -> dict | None:
     """
     Compares the observations to a standard observation
 
-    :param observations: A list of dictionary containing the observation data
-    :return: list of qualified observations
+    :param observation: A dictionary containing the observation data
+    :return: observation if it is qualified, else None
     """
-    for observation in observations:
-        if observation["data"] != STANDARD_OBSERVATION["data"]:
-            yield observation
+    if observation["data"] != STANDARD_OBSERVATION["data"]:
+        return observation
+
+    return None
 

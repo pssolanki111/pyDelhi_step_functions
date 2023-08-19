@@ -1,15 +1,31 @@
+import csv
+
 
 def handler(event, context):
     csv_text = event['csv_text']
-    lines = csv_text.strip().split('\n')
-    cleaned_data, observations = None, []
+    reader = csv.reader(csv_text.split('\n'), delimiter=',')
+    cleaned_data, observations = {}, []
 
-    for line in lines[1:]:
-        parts = line.split(',')
-        timestamp, equipment_id, measurement_type, observation_id, data, wavelengths, unit = parts
+    for row in reader:
+        try:
+            timestamp, equipment_id, measurement_type, observation_id, data, wavelengths, unit = row
+        except ValueError:
+            continue
 
         if not all([timestamp, equipment_id, measurement_type, observation_id]):
-            continue  # Skip empty lines
+            continue
+
+        final_data_values, final_wavelengths = [], []
+        for datum in data:
+            try:
+                final_data_values.append(float(datum))
+            except (ValueError, TypeError):
+                final_data_values.append(0.0)
+        for wavelength in wavelengths:
+            try:
+                final_wavelengths.append(int(wavelength))
+            except (ValueError, TypeError):
+                final_wavelengths.append(0)
 
         if not cleaned_data:
             cleaned_data = {
@@ -21,13 +37,12 @@ def handler(event, context):
         if measurement_type == 'spectral_analysis':
             observation = {
                 'observation_id': observation_id,
-                'data': [float(val) if val != 'null' and val != 'error' and val != 'invalid' else 0.0 for val in
-                         data.split(',')],
-                'wavelengths': [int(val) if val != '' else 0 for val in wavelengths.split(',')],
+                'data': data,
+                'wavelengths': wavelengths,
                 'unit': unit
             }
             observations.append(observation)
 
     cleaned_data['observations'] = observations
     cleaned_data['number_of_observations'] = len(observations)
-    return {"cleaned_data": cleaned_data}
+    return cleaned_data
